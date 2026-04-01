@@ -1,4 +1,6 @@
-"""Rule: check packages against a known malicious blocklist."""
+'''
+Rule: check packages against a known malicious blocklist.
+'''
 
 from pathlib import Path
 
@@ -11,12 +13,6 @@ def check_blocklist(packages: list[Package], blocklist_path: Path) -> list[Findi
     The blocklist is a plain-text file with one package name per line.
     Lines starting with '#' are treated as comments and ignored.
 
-    Args:
-        packages: List of packages extracted from the lockfile.
-        blocklist_path: Path to the blocklist file.
-
-    Returns:
-        A list of Finding dicts, one per matched package.
     """
     if not blocklist_path.exists():
         return []
@@ -40,14 +36,8 @@ def check_blocklist(packages: list[Package], blocklist_path: Path) -> list[Findi
 
 
 def _load_blocklist(path: Path) -> set[str]:
-    """Read and parse a blocklist file into a set of lowercase package names.
+    # Read and parse a blocklist file into a set of lowercase package names.
 
-    Args:
-        path: Path to the blocklist file.
-
-    Returns:
-        A set of lowercase package name strings.
-    """
     blocked: set[str] = set()
     try:
         with open(path, "r", encoding="utf-8") as f:
