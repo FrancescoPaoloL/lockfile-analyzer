@@ -1,0 +1,32 @@
+# Known malicious npm packages
+# Sources: npm security advisories, Sonatype OSS Index, Snyk vulnerability DB
+
+# Supply chain attacks (real cases)
+event-stream
+flatmap-stream
+plain-crypto-js
+axios-unsafe
+nodemailer-backdoor
+crossenv
+cross-env.js
+d3.js
+ffmpeg.js
+jquery.js
+uglifyjs
+yarnpkg
+nodeenv
+nodecoin
+discordi.js
+discord.io
+
+# Typosquat classics
+babelcli
+momen
+mongose
+expres
+requset
+requet
+coookies
+cokie
+coffeescript2
+
