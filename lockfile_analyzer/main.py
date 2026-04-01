@@ -23,6 +23,7 @@ from .rules.integrity import check_integrity
 from .rules.transitive import check_transitive
 from .rules.typosquat import check_typosquat
 from .rules.version import check_version
+from .rules.secrets import check_secrets
 
 # Default paths relative to the installed package's data directory.
 _DATA_DIR: Path = Path(__file__).parent.parent / "data"
@@ -101,6 +102,8 @@ def main() -> None:
     findings += check_transitive(packages)
     findings += check_version(packages)
     findings += check_integrity(packages)
+    findings += check_secrets(packages)
+
 
     report(findings, total=len(packages))
 

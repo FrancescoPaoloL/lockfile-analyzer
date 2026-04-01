@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "lockfile-analyzer"
+version = "0.1.0"
+description = "Static security analyzer for npm lockfiles"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["security", "npm", "supply-chain", "lockfile", "static-analysis"]
+dependencies = []
+
+[project.scripts]
+lockfile-analyzer = "lockfile_analyzer.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lockfile_analyzer*"]
+
+[tool.setuptools.package-data]
+"*" = ["data/*.txt"]
+
