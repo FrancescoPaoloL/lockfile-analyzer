@@ -25,7 +25,9 @@ class Package(TypedDict):
     dev: bool
     path: str
     source: str
-
+    # Lifecycle scripts (preinstall, install, postinstall, ...) extracted from
+    # the lockfile entry. None when the lockfile/format does not carry them.
+    scripts: dict[str, str] | None
 
 class Finding(TypedDict):
     #A security finding produced by a rule.

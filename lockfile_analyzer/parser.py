@@ -84,6 +84,7 @@ def _extract_packages_v2(data: dict, path: Path) -> list[Package]:
             continue
 
         name = _extract_name_from_path(pkg_path)
+        scripts = meta.get("scripts")
         packages.append(Package(
             name=name,
             version=meta.get("version") or "unknown",
@@ -93,6 +94,7 @@ def _extract_packages_v2(data: dict, path: Path) -> list[Package]:
             dev=bool(meta.get("dev", False)),
             path=pkg_path,
             source=path.name,
+            scripts=scripts if isinstance(scripts, dict) else None,
         ))
 
     return packages
@@ -115,6 +117,7 @@ def _extract_packages_v1(data: dict, path: Path) -> list[Package]:
             dev=bool(meta.get("dev", False)),
             path=f"node_modules/{name}",
             source=path.name,
+            scripts=None,
         ))
 
     return packages
@@ -188,6 +191,7 @@ def _parse_yarn_block(block: str, path: Path) -> Package | None:
         dev=False,  # yarn.lock v1 does not distinguish dev from prod.
         path=f"node_modules/{name}",
         source=path.name,
+        scripts=None,
     )
 
 
