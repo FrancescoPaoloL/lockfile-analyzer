@@ -1,6 +1,6 @@
 # lockfile-analyzer
 
-A learning project for supply chain security. Statically analyzes npm lockfiles (`package-lock.json`, `yarn.lock`) for signs of compromise. No network calls, no external dependencies.
+A learning project for supply chain security. Statically analyzes npm lockfiles (`package-lock.json`, `yarn.lock`) for signs of compromise. No external dependencies.
 
 Inspired by two real-world incidents that happened on the same day (March 31, 2026): a malicious version of `axios` was pushed to npm containing a Remote Access Trojan, and Anthropic accidentally shipped Claude Code's internal source code inside a public npm package ([read more](https://venturebeat.com/technology/claude-codes-source-code-appears-to-have-leaked-heres-what-we-know)). Both cases showed that lockfiles are not just boring metadata: they record exactly what got installed, from where, and with what credentials. If something slipped in, the lockfile knows. This tool is my attempt to understand how to detect that programmatically.
 
@@ -17,12 +17,17 @@ A month later, on April 30, 2026, attackers stole npm credentials and used them 
 | `version` | MEDIUM / LOW | Odd pre-release suffix, git hash version, non-registry source |
 | `integrity` | MEDIUM / LOW | Missing or malformed integrity hash |
 | `lifecycle` | HIGH / MEDIUM | Suspicious commands in install scripts (curl/wget, pipe-to-shell, scripts hidden in `.vscode/` or `.claude/`) |
+| `registry` | HIGH / LOW | Integrity hash mismatch or package not found on registry.npmjs.org (opt-in, requires network) |
 
 ## How it works
 
 The tool parses a lockfile into a uniform `Package(name, version, source, integrity, scripts)` model. The shape is the same whether the input is `package-lock.json` or `yarn.lock`. Each rule in `lockfile_analyzer/rules/` receives the full package list and returns zero or more `Finding`s tagged with a severity. Rules are independent: order does not matter, and adding one does not affect the others. The CLI aggregates findings, prints them grouped by severity, and exits with `0/1/2` based on the highest severity seen.
 
-Rules with external state (`blocklist`, `typosquat`) read their reference data from `data/` at startup: `blocklist.txt` for known-bad names, `top_packages.txt` for the typosquat baseline. These are static snapshots, updated by editing the files. No network calls at any point.
+Rules with external state (`blocklist`, `typosquat`) read their reference data from `data/` at startup: `blocklist.txt` for known-bad names, `top_packages.txt` for the typosquat baseline. These are static snapshots, updated by editing the files.
+
+The `--verify-registry` flag enables a network check that compares each package's local integrity hash against `registry.npmjs.org`. A mismatch means the lockfile was modified without going through npm. This is the only part of the tool that makes network calls, and it is opt-in.
+
+The `--diff` flag accepts a second lockfile (the state before a PR) and restricts analysis to packages that are new or have a changed integrity hash. This is the mode used by the GitHub Action, which compares the PR lockfile against the state on `main`.
 
 ## Usage
 
@@ -37,9 +42,26 @@ PYTHONPATH=. python -m lockfile_analyzer.main tests/fixtures/package-lock.json
 
 # see the lifecycle rule in action
 PYTHONPATH=. python -m lockfile_analyzer.main tests/fixtures/lifecycle-malicious.json
+
+# analyze only what changed relative to a previous lockfile
+PYTHONPATH=. python -m lockfile_analyzer.main package-lock.json \
+  --diff path/to/package-lock-before.json
+
+# verify integrity hashes against registry.npmjs.org (requires network)
+PYTHONPATH=. python -m lockfile_analyzer.main package-lock.json \
+  --verify-registry
+
+# both together — typical CI usage
+PYTHONPATH=. python -m lockfile_analyzer.main package-lock.json \
+  --diff path/to/package-lock-before.json \
+  --verify-registry
 ```
 
 Exit codes: `0` clean, `1` medium/low findings, `2` high findings.
+
+## CI integration
+
+A GitHub Action is included at `.github/workflows/lockfile-check.yml`. It triggers on pull requests that modify `package-lock.json` or `yarn.lock`, fetches the lockfile from `main` as the diff base, and blocks merge on HIGH findings via exit code 2. If the lockfile is new (not present on `main`), it falls back to full analysis.
 
 ## Sample output
 
@@ -67,8 +89,9 @@ Output is coloured when stdout is a TTY, plain text otherwise.
 
 ## Limitations
 
-- **Static only.** Reads the lockfile, does not fetch tarballs, does not execute install scripts, does not verify what is actually published on the registry.
-- **npm and yarn only.** No pnpm (different lockfile format), no bun, no Python (`poetry.lock`, `uv.lock`), no Rust (`Cargo.lock`).
+- **Static by default.** Reads the lockfile, does not fetch tarballs, does not execute install scripts. Use `--verify-registry` to add a registry integrity check.
+- **Registry check is not tamper-proof.** If the attacker controls the registry entry (compromised maintainer account), the hash will match and the check passes. This is the ua-parser-js class of attack.
+- **npm and yarn only.** No pnpm, no bun, no Python (`poetry.lock`, `uv.lock`), no Rust (`Cargo.lock`).
 - **Blocklist and top-packages list are static snapshots** in `data/`, updated by hand. No live lookup against OSV, GHSA, or any advisory database.
 - **Typosquat detection is edit-distance based.** Names legitimately close to popular ones (e.g. `lodash-es` vs `lodash`) can trigger false positives.
 - **Lifecycle rule is regex-based** on install script bodies. An attacker who base64-encodes the command and decodes it at runtime will bypass the patterns.
@@ -95,4 +118,3 @@ Ohm, Plate, Sykosch, Meier. Backstabber's Knife Collection: A Review of Open Sou
 ## Connect with me
 
 [LinkedIn](https://www.linkedin.com/in/francescopl/) · [Kaggle](https://www.kaggle.com/francescopaolol)
-
