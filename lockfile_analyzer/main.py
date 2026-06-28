@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 '''
 lockfile-analyzer: static security analyzer for npm lockfiles.
-
 Analyses package-lock.json or yarn.lock files for signs of supply chain
 compromise without making any network requests.
-
 Exit codes:
     0 — No issues found.
     1 — One or more MEDIUM or LOW findings.
     2 — One or more HIGH findings.
 '''
-
 import argparse
 import sys
 from pathlib import Path
-
 from .models import Severity
 from .parser import LockfileParseError, parse_lockfile
 from .reporter import report
@@ -25,7 +21,8 @@ from .rules.typosquat import check_typosquat
 from .rules.version import check_version
 from .rules.secrets import check_secrets
 from .rules.lifecycle import check_lifecycle
-
+from .differ import diff_packages
+from .registry import verify_packages
 
 # Default paths relative to the installed package's data directory.
 _DATA_DIR: Path = Path(__file__).parent.parent / "data"
@@ -76,6 +73,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
             f"(default: {_DEFAULT_LEVENSHTEIN_THRESHOLD})."
         ),
     )
+    parser.add_argument(
+        "--diff",
+        type=Path,
+        default=None,
+        metavar="LOCKFILE_BEFORE",
+        help="Analyze only packages added or changed relative to LOCKFILE_BEFORE.",
+    )
+    parser.add_argument(
+        "--verify-registry",
+        action="store_true",
+        default=False,
+        help="Verify integrity hashes against registry.npmjs.org (requires network).",
+    )
     return parser
 
 
@@ -98,6 +108,20 @@ def main() -> None:
         print("[ERROR] No packages found in lockfile.", file=sys.stderr)
         sys.exit(1)
 
+    if args.diff is not None:
+        if not args.diff.exists():
+            print(f"[ERROR] Diff base not found: {args.diff}", file=sys.stderr)
+            sys.exit(1)
+        try:
+            packages_before = parse_lockfile(args.diff)
+        except LockfileParseError as exc:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+            sys.exit(1)
+        packages = diff_packages(packages_before, packages)
+        if not packages:
+            print("[OK] No new or changed packages.")
+            sys.exit(0)
+
     findings = []
     findings += check_blocklist(packages, args.blocklist)
     findings += check_typosquat(packages, args.top_packages, args.levenshtein_threshold)
@@ -107,6 +131,8 @@ def main() -> None:
     findings += check_secrets(packages)
     findings += check_lifecycle(packages)
 
+    if args.verify_registry:
+        findings += verify_packages(packages)
 
     report(findings, total=len(packages))
 
