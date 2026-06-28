@@ -1,0 +1,42 @@
+name: lockfile-check
+
+on:
+  pull_request:
+    paths:
+      - 'package-lock.json'
+      - 'yarn.lock'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Get lockfile from main
+        id: get_before
+        run: |
+          if git show origin/main:package-lock.json > /tmp/lockfile_before.json 2>/dev/null; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run analyzer (diff mode)
+        if: steps.get_before.outputs.found == 'true'
+        run: |
+          PYTHONPATH=. python -m lockfile_analyzer.main package-lock.json \
+            --diff /tmp/lockfile_before.json \
+            --verify-registry
+
+      - name: Run analyzer (full mode, lockfile is new)
+        if: steps.get_before.outputs.found == 'false'
+        run: |
+          PYTHONPATH=. python -m lockfile_analyzer.main package-lock.json \
+            --verify-registry
+
